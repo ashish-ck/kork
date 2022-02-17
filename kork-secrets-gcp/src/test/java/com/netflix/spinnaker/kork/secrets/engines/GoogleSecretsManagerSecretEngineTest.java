@@ -20,6 +20,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.MockitoAnnotations.initMocks;
 
+import com.google.cloud.secretmanager.v1.SecretPayload;
+import com.google.protobuf.ByteString;
 import com.netflix.spinnaker.kork.secrets.EncryptedSecret;
 import com.netflix.spinnaker.kork.secrets.InvalidSecretFormatException;
 import com.netflix.spinnaker.kork.secrets.SecretException;
@@ -35,12 +37,22 @@ public class GoogleSecretsManagerSecretEngineTest {
       new GoogleSecretsManagerSecretEngine();
 
   @Rule public ExpectedException exceptionRule = ExpectedException.none();
-
-  private String minioAccessKeyId = "{\"minioAccessKeyId\":\"minioadmin\"}";
-  private String binarySecretValue = "-----BEGIN CERTIFICATE-----";
-  private String secretStringFileValue = "-----BEGIN CERTIFICATE-----";
-  private String kvSecretValue = "minioadmin";
-  private String plaintextSecretValue = "my-k8s-v2-account-name";
+  private SecretPayload minioAccessKeyId =
+      SecretPayload.newBuilder()
+          .setData(ByteString.copyFromUtf8("{\"minioAccessKeyId\":\"minioadmin\"}"))
+          .build();
+  private SecretPayload binarySecretValue =
+      SecretPayload.newBuilder()
+          .setData(ByteString.copyFromUtf8("-----BEGIN CERTIFICATE-----"))
+          .build();
+  private SecretPayload secretStringFileValue =
+      SecretPayload.newBuilder()
+          .setData(ByteString.copyFromUtf8("-----BEGIN CERTIFICATE-----"))
+          .build();
+  private SecretPayload kvSecretValue =
+      SecretPayload.newBuilder().setData(ByteString.copyFromUtf8("minioadmin")).build();
+  private SecretPayload plaintextSecretValue =
+      SecretPayload.newBuilder().setData(ByteString.copyFromUtf8("my-k8s-v2-account-name")).build();
 
   @Before
   public void setup() {

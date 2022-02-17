@@ -18,6 +18,7 @@ package com.netflix.spinnaker.kork.secrets.engines;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.gax.rpc.ApiException;
 import com.google.cloud.secretmanager.v1.*;
 import com.netflix.spinnaker.kork.secrets.EncryptedSecret;
 import com.netflix.spinnaker.kork.secrets.InvalidSecretFormatException;
@@ -28,8 +29,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class GoogleSecretsManagerSecretEngine implements SecretEngine {
   protected static final String PROJECT_NUMBER = "p";
@@ -53,7 +56,7 @@ public class GoogleSecretsManagerSecretEngine implements SecretEngine {
     String secretId = encryptedSecret.getParams().get(SECRET_ID);
     String secretKey = encryptedSecret.getParams().get(SECRET_KEY);
     if (encryptedSecret.isEncryptedFile()) {
-      return getSecretValue(projectNumber, secretId).getBytes();
+      return getSecretValue(projectNumber, secretId).getData().toStringUtf8().getBytes();
     } else if (secretKey != null) {
       return getSecretString(projectNumber, secretId, secretKey);
     } else {
@@ -66,7 +69,7 @@ public class GoogleSecretsManagerSecretEngine implements SecretEngine {
     Set<String> paramNames = encryptedSecret.getParams().keySet();
     if (!paramNames.contains(PROJECT_NUMBER)) {
       throw new InvalidSecretFormatException(
-          "Project id parameter is missing (" + PROJECT_NUMBER + "=...)");
+          "Project number parameter is missing (" + PROJECT_NUMBER + "=...)");
     }
     if (!paramNames.contains(SECRET_ID)) {
       throw new InvalidSecretFormatException(
@@ -77,13 +80,14 @@ public class GoogleSecretsManagerSecretEngine implements SecretEngine {
     }
   }
 
-  protected String getSecretValue(String projectNumber, String secretId) {
-    try (SecretManagerServiceClient client = SecretManagerServiceClient.create()) {
+  protected SecretPayload getSecretValue(String projectNumber, String secretId) {
+    try {
+      SecretManagerServiceClient client = SecretManagerServiceClient.create();
       SecretVersionName secretVersionName =
           SecretVersionName.of(projectNumber, secretId, VERSION_ID);
       AccessSecretVersionResponse response = client.accessSecretVersion(secretVersionName);
-      return response.getPayload().getData().toStringUtf8();
-    } catch (IOException e) {
+      return response.getPayload();
+    } catch (IOException | ApiException e) {
       throw new SecretException(
           String.format(
               "Failed to parse secret when using Google Secrets Manager to fetch: [projectNumber: %s, secretId: %s]",
@@ -99,7 +103,7 @@ public class GoogleSecretsManagerSecretEngine implements SecretEngine {
 
   private byte[] getSecretString(String projectNumber, String secretId, String secretKey) {
     if (!cache.containsKey(secretId)) {
-      String secretString = getSecretValue(projectNumber, secretId);
+      String secretString = getSecretValue(projectNumber, secretId).getData().toStringUtf8();
       try {
         Map<String, String> map = mapper.readValue(secretString, Map.class);
         cache.put(secretId, map);
@@ -122,6 +126,6 @@ public class GoogleSecretsManagerSecretEngine implements SecretEngine {
   }
 
   private byte[] getSecretString(String projectNumber, String secretId) {
-    return getSecretValue(projectNumber, secretId).getBytes();
+    return getSecretValue(projectNumber, secretId).getData().toStringUtf8().getBytes();
   }
 }
